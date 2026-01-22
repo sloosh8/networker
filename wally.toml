@@ -11,4 +11,4 @@ exclude = ["**"]
 include = ["src", "src/*", "default.project.json", "wally.lock", "wally.toml", "LICENSE"]
 
 [dependencies]
-Signal = "sleitnick/signal@2.0.0"
+Signal = "sleitnick/signal@2.0.3"

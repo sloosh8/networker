@@ -1,7 +1,7 @@
 --!strict
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
 local NetworkerUtils = require(script.Parent.NetworkerUtils)
 
@@ -117,20 +117,30 @@ end
 	@return ()  
 ]=]
 function NetworkerServer.addClientAccess(self: NetworkerServer, module: any, methods: { any }): ()
-	for _, method in methods do
-		for funcName, func in module do
-			if func ~= method then
-				continue
+	local function addAccess(accessModule: any)
+		for _, method in methods do
+			for funcName, func in accessModule do
+				if func ~= method then
+					continue
+				end
+
+				assert(self._accessLookup[funcName] == nil, "Client access method already exists: " .. funcName)
+				assert(type(func) == "function", "Client access method must be a function: " .. funcName)
+
+				self._accessLookup[funcName] = {
+					module = module,
+					method = method,
+				}
 			end
-
-			assert(self._accessLookup[funcName] == nil, "Client access method already exists: " .. funcName)
-			assert(type(func) == "function", "Client access method must be a function: " .. funcName)
-
-			self._accessLookup[funcName] = {
-				module = module,
-				method = method,
-			}
 		end
+	end
+
+	addAccess(module)
+
+	local metatable = getmetatable(module)
+	local metatableModule = if metatable then metatable.__index else metatable
+	if metatableModule then
+		addAccess(metatableModule)
 	end
 end
 

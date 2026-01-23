@@ -111,7 +111,7 @@ end
 	@return any? -- The result of the method
 	@yields
 ]=]
-function NetworkerClient.fetch(self: NetworkerClient, method: string, ...: any): any?
+function NetworkerClient.fetch(self: NetworkerClient, method: string, ...: any): ...any
 	if not RunService:IsRunning() then
 		return nil
 	end

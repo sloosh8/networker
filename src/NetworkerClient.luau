@@ -1,4 +1,5 @@
 --!strict
+--NetworkerClient.luau
 local RunService = game:GetService("RunService")
 
 local Packages = script.Parent.Parent
@@ -76,6 +77,19 @@ function NetworkerClient.new(networkTag: NetworkTag, module: {}): NetworkerClien
 		module[method](module, key, ...)
 	end)
 
+	remotes.UnreliableRemoteEvent.OnClientEvent:Connect(function(method: string, key: string, ...: any?)
+		if method == NetworkerUtils.SET_TAG then
+			module[key] = ...
+			if self.changedSignals[key] then
+				self.changedSignals[key]:Fire(module[key])
+			end
+			return
+		end
+
+		assert(module[method], "Method " .. method .. " does not exist on networkTag " .. remotes.Name)
+		module[method](module, key, ...)
+	end)
+
 	return self
 end
 
@@ -111,7 +125,7 @@ end
 	@return any? -- The result of the method
 	@yields
 ]=]
-function NetworkerClient.fetch(self: NetworkerClient, method: string, ...: any): ...any
+function NetworkerClient.fetch(self: NetworkerClient, method: string, ...: any): any?
 	if not RunService:IsRunning() then
 		return nil
 	end

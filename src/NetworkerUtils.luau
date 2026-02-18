@@ -8,11 +8,14 @@ export type ClientAccess = { (...any?) -> ...any? }
 	@type NetworkTag string | Instance  
 	@within NetworkerServer  
 ]=]
+
+--networker utils.luau
 export type NetworkTag = string | Instance
 
 export type RemotesContainer = Folder & {
 	RemoteEvent: RemoteEvent,
 	RemoteFunction: RemoteFunction,
+	UnreliableRemoteEvent: UnreliableRemoteEvent,
 }
 
 return {

@@ -1,7 +1,8 @@
 --!strict
+--NetworkerServer.luau
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
 
 local NetworkerUtils = require(script.Parent.NetworkerUtils)
 
@@ -34,6 +35,7 @@ export type NetworkerServer = typeof(setmetatable(
 		networkTag: NetworkTag,
 		event: RemoteEvent,
 		func: RemoteFunction,
+		unreliable: UnreliableRemoteEvent,
 		remotes: RemotesContainer,
 		instance: Instance?,
 		instanceConn: RBXScriptConnection?,
@@ -59,14 +61,19 @@ function NetworkerServer.new(networkTag: NetworkTag, module: {}?, clientAccess: 
 	}, NetworkerServer)
 
 	local remotes = Instance.new("Folder")
+
 	local event = Instance.new("RemoteEvent")
 	local func = Instance.new("RemoteFunction")
+	local unreliable = Instance.new("UnreliableRemoteEvent")
+
 	event.Parent = remotes
 	func.Parent = remotes
+	unreliable.Parent = remotes
 
 	self.remotes = remotes :: RemotesContainer
 	self.event = event
 	self.func = func
+	self.unreliable = unreliable
 
 	if typeof(networkTag) == "Instance" then
 		local instance = networkTag :: Instance
@@ -105,6 +112,7 @@ function NetworkerServer.new(networkTag: NetworkTag, module: {}?, clientAccess: 
 	end
 
 	event.OnServerEvent:Connect(callback)
+	unreliable.OnServerEvent:Connect(callback)
 	func.OnServerInvoke = callback
 
 	return self
@@ -117,30 +125,20 @@ end
 	@return ()  
 ]=]
 function NetworkerServer.addClientAccess(self: NetworkerServer, module: any, methods: { any }): ()
-	local function addAccess(accessModule: any)
-		for _, method in methods do
-			for funcName, func in accessModule do
-				if func ~= method then
-					continue
-				end
-
-				assert(self._accessLookup[funcName] == nil, "Client access method already exists: " .. funcName)
-				assert(type(func) == "function", "Client access method must be a function: " .. funcName)
-
-				self._accessLookup[funcName] = {
-					module = module,
-					method = method,
-				}
+	for _, method in methods do
+		for funcName, func in module do
+			if func ~= method then
+				continue
 			end
+
+			assert(self._accessLookup[funcName] == nil, "Client access method already exists: " .. funcName)
+			assert(type(func) == "function", "Client access method must be a function: " .. funcName)
+
+			self._accessLookup[funcName] = {
+				module = module,
+				method = method,
+			}
 		end
-	end
-
-	addAccess(module)
-
-	local metatable = getmetatable(module)
-	local metatableModule = if metatable then metatable.__index else metatable
-	if metatableModule then
-		addAccess(metatableModule)
 	end
 end
 
@@ -200,6 +198,17 @@ function NetworkerServer.fire(self: NetworkerServer, players: PlayerGroup, metho
 	end
 end
 
+function NetworkerServer.fireUnreliable(self: NetworkerServer, players: PlayerGroup, method: string, ...: any?): ()
+	if typeof(players) == "Instance" then
+		self.unreliable:FireClient(players, method, ...)
+		return
+	end
+
+	for _, player in players :: { Player } do
+		self.unreliable:FireClient(player, method, ...)
+	end
+end
+
 --[=[
 	Fires a method to all players  
 	@param method string -- The name of the method to fire  
@@ -208,6 +217,10 @@ end
 ]=]
 function NetworkerServer.fireAll(self: NetworkerServer, method: string, ...: any?): ()
 	self.event:FireAllClients(method, ...)
+end
+
+function NetworkerServer.fireUnreliableAll(self: NetworkerServer, method: string, ...: any?): ()
+	self.unreliable:FireAllClients(method, ...)
 end
 
 --[=[
@@ -225,6 +238,23 @@ function NetworkerServer.fireAllExcept(self: NetworkerServer, players: PlayerGro
 	for _, player in Players:GetPlayers() do
 		if not table.find(players :: { Player }, player) then
 			self.event:FireClient(player, method, ...)
+		end
+	end
+end
+
+function NetworkerServer.fireAllUnreliableExcept(
+	self: NetworkerServer,
+	players: PlayerGroup,
+	method: string,
+	...: any?
+): ()
+	if typeof(players) == "Instance" then
+		players = { players }
+	end
+
+	for _, player in Players:GetPlayers() do
+		if not table.find(players :: { Player }, player) then
+			self.unreliable:FireClient(player, method, ...)
 		end
 	end
 end
